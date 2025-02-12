@@ -18,6 +18,9 @@ namespace MMO_EFCore
 		// DbSet<Item> -> EF Core한테 알려준다
 		// Items이라는 DB 테이블이 있는데, 세부적인 칼럼/키 정보는 Item 클래스를 참고해!
 		public DbSet<Item> Items { get; set; }
+		// TPH
+		//public DbSet<EventItem> EventItems { get; set; }
+
 		public DbSet<Player> Players { get; set; }
 		public DbSet<Guild> Guilds { get; set; }
 
@@ -28,6 +31,38 @@ namespace MMO_EFCore
 		protected override void OnConfiguring(DbContextOptionsBuilder options)
 		{
 			options.UseSqlServer(ConnectionString);
+		}
+
+		protected override void OnModelCreating(ModelBuilder builder)
+		{
+			// 앞으로 Item Entity에 접근할 때 항상 사용되는 모델 레벨의 필터링
+			// 필터를 무시하고 싶으면 IgnoreQueryFilters 옵션 추가
+			builder.Entity<Item>().HasQueryFilter(i => i.SoftDeleted == false);
+
+			builder.Entity<Player>()
+				.HasIndex(p => p.Name)
+				.HasName("Index_Person_Name")
+				.IsUnique();
+
+			// Owned Type
+			builder.Entity<Item>()
+				.OwnsOne(i => i.Option)
+				.ToTable("ItemOption");
+
+			// TPH
+			builder.Entity<Item>()
+				.HasDiscriminator(i => i.Type)
+				.HasValue<Item>(ItemType.NormalItem)
+				.HasValue<EventItem>(ItemType.EventItem);
+
+			// Table Splitting
+			builder.Entity<Item>()
+				.HasOne(i => i.Detail)
+				.WithOne()
+				.HasForeignKey<ItemDetail>(i => i.ItemDetailId);
+
+			builder.Entity<Item>().ToTable("Items");
+			builder.Entity<ItemDetail>().ToTable("Items");
 		}
 	}
 }
